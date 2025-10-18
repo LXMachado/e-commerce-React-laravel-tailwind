@@ -18,10 +18,14 @@ const Register: React.FC = () => {
     setLoading(true)
 
     try {
+      console.log('Attempting registration for:', email)
       await register(name, email, password, passwordConfirmation)
+      console.log('Registration successful')
       navigate('/login')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed')
+      console.error('Registration error:', err)
+      console.error('Error response:', err.response?.data)
+      setError(err.response?.data?.message || err.message || 'Registration failed')
     } finally {
       setLoading(false)
     }
