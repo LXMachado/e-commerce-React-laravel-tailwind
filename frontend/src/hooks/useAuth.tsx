@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import api from '../services/api'
+import api, { getCsrfCookie } from '../services/api'
 
 interface User {
   id: number
@@ -48,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const login = async (email: string, password: string) => {
+    await getCsrfCookie()
     const response = await api.post('/api/auth/login', { email, password })
     const { user, token } = response.data
     localStorage.setItem('auth_token', token)
@@ -55,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const register = async (name: string, email: string, password: string, passwordConfirmation: string) => {
+    await getCsrfCookie()
     await api.post('/api/auth/register', { name, email, password, password_confirmation: passwordConfirmation })
   }
 

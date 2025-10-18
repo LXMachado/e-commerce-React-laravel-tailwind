@@ -11,7 +11,7 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])->group(function () {
     Route::post('/register', RegisterController::class)->name('auth.register');
     Route::post('/login', LoginController::class)->name('auth.login');
     Route::post('/logout', LogoutController::class)->name('auth.logout')->middleware('auth:sanctum');

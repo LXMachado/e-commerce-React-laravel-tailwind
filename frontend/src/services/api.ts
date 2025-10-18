@@ -9,7 +9,7 @@ const api = axios.create({
   },
 })
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and CSRF token
 api.interceptors.request.use((config) => {
   console.log('API Request:', config.method?.toUpperCase(), config.url)
   const token = localStorage.getItem('auth_token')
@@ -17,8 +17,38 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`
     console.log('Adding auth token to request')
   }
+
+  // Add CSRF token for stateful requests
+  const csrfToken = getCookie('XSRF-TOKEN')
+  if (csrfToken && config.url?.includes('/api/auth/')) {
+    config.headers['X-XSRF-TOKEN'] = decodeURIComponent(csrfToken)
+    console.log('Adding CSRF token to request')
+  }
+
   return config
 })
+
+// Helper function to get cookie value
+const getCookie = (name: string): string | null => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift() || null
+  }
+  return null
+}
+
+// Function to get CSRF cookie
+export const getCsrfCookie = async (): Promise<void> => {
+  try {
+    await axios.get('http://localhost:8000/sanctum/csrf-cookie', {
+      withCredentials: true,
+    })
+    console.log('CSRF cookie obtained')
+  } catch (error) {
+    console.error('Failed to get CSRF cookie:', error)
+  }
+}
 
 // Response interceptor to handle token refresh
 api.interceptors.response.use(
