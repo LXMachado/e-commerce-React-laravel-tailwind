@@ -1,0 +1,51 @@
+{
+  "name": "weekender-ecommerce",
+  "version": "1.0.0",
+  "description": "Micro-Camping & Weekender Tech Gear e-commerce platform",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && php artisan serve --host=0.0.0.0 --port=8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "concurrently \"npm run build:frontend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "lint": "concurrently \"npm run lint:frontend\" \"npm run lint:backend\"",
+    "lint:frontend": "cd frontend && eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:backend": "cd backend && php-cs-fixer fix --dry-run --diff",
+    "lint:fix": "concurrently \"npm run lint:fix:frontend\" \"npm run lint:fix:backend\"",
+    "lint:fix:frontend": "cd frontend && eslint . --ext ts,tsx --fix",
+    "lint:fix:backend": "cd backend && php-cs-fixer fix",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,php,md}\" --ignore-path .prettierignore",
+    "test": "concurrently \"npm run test:frontend\" \"npm run test:backend\"",
+    "test:frontend": "cd frontend && npm run test",
+    "test:backend": "cd backend && php artisan test",
+    "type-check": "cd frontend && npx tsc --noEmit",
+    "prepare": "cd frontend && npm install && cd ../backend && composer install"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@types/node": "^22.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.1",
+    "@typescript-eslint/parser": "^8.0.1",
+    "concurrently": "^8.2.2",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.9",
+    "globals": "^15.9.0",
+    "php-cs-fixer": "^3.0.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.0.1"
+  },
+  "keywords": [
+    "laravel",
+    "react",
+    "typescript",
+    "ecommerce",
+    "camping",
+    "solar",
+    "weekender"
+  ],
+  "author": "Weekender Team",
+  "license": "MIT"
+}
