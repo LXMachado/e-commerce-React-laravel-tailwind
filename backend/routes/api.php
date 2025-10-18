@@ -55,3 +55,18 @@ Route::middleware(['auth:sanctum'])->prefix('admin/catalog')->name('admin.catalo
     Route::delete('/variants/{variant}', [App\Http\Controllers\Api\ProductVariantController::class, 'destroy'])->name('variants.destroy');
     Route::patch('/variants/{variant}/stock', [App\Http\Controllers\Api\ProductVariantController::class, 'updateStock'])->name('variants.update-stock');
 });
+
+// Cart API Routes (Mixed authentication - guests and users)
+Route::prefix('cart')->name('cart.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Api\CartController::class, 'show'])->name('show');
+    Route::post('/items', [App\Http\Controllers\Api\CartController::class, 'addItem'])->name('add-item');
+    Route::put('/items/{item}', [App\Http\Controllers\Api\CartController::class, 'updateItem'])->name('update-item');
+    Route::delete('/items/{item}', [App\Http\Controllers\Api\CartController::class, 'removeItem'])->name('remove-item');
+    Route::delete('/', [App\Http\Controllers\Api\CartController::class, 'clear'])->name('clear');
+    Route::get('/totals', [App\Http\Controllers\Api\CartController::class, 'totals'])->name('totals');
+});
+
+// Protected Cart Routes (Authenticated users only)
+Route::middleware(['auth:sanctum'])->prefix('cart')->name('cart.')->group(function () {
+    Route::post('/merge-guest', [App\Http\Controllers\Api\CartController::class, 'mergeGuestCart'])->name('merge-guest');
+});
