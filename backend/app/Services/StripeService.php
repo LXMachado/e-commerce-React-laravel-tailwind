@@ -7,6 +7,7 @@ use Stripe\PaymentIntent;
 use Stripe\Webhook;
 use App\Models\Cart;
 use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StripeService
@@ -178,7 +179,7 @@ class StripeService
     /**
      * Create order from successful cart payment
      */
-    private function createOrderFromCart(Cart $cart, array $paymentIntent): Order
+    public function createOrderFromCart(Cart $cart, array $paymentIntent): Order
     {
         return DB::transaction(function () use ($cart, $paymentIntent) {
             // Create order
