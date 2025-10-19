@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Services\StripeService;
+use App\Services\ShippingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -14,10 +15,12 @@ use Illuminate\Support\Facades\Log;
 class CheckoutController extends Controller
 {
     private StripeService $stripeService;
+    private ShippingService $shippingService;
 
-    public function __construct(StripeService $stripeService)
+    public function __construct(StripeService $stripeService, ShippingService $shippingService)
     {
         $this->stripeService = $stripeService;
+        $this->shippingService = $shippingService;
     }
 
     /**
@@ -167,7 +170,11 @@ class CheckoutController extends Controller
             // Process successful payment
             $order = null;
             if ($cart) {
-                $order = $this->processSuccessfulPayment($cart, $paymentIntent);
+                // Get shipping information from request if provided
+                $shippingPostcode = $request->input('shipping_postcode');
+                $shippingMethodCode = $request->input('shipping_method_code');
+
+                $order = $this->processSuccessfulPayment($cart, $paymentIntent, $shippingPostcode, $shippingMethodCode);
             }
 
             return response()->json([
@@ -345,9 +352,40 @@ class CheckoutController extends Controller
     /**
      * Process successful payment and create order
      */
-    private function processSuccessfulPayment(Cart $cart, $paymentIntent): Order
+    private function processSuccessfulPayment(Cart $cart, $paymentIntent, ?string $shippingPostcode = null, ?string $shippingMethodCode = null): Order
     {
-        return DB::transaction(function () use ($cart, $paymentIntent) {
+        return DB::transaction(function () use ($cart, $paymentIntent, $shippingPostcode, $shippingMethodCode) {
+            // Calculate shipping if postcode provided
+            $shippingAmount = 0;
+            $shippingData = null;
+
+            if ($shippingPostcode) {
+                $shippingQuote = $this->shippingService->calculateShippingCost(
+                    $shippingPostcode,
+                    $cart->total_weight,
+                    $shippingMethodCode
+                );
+
+                if ($shippingQuote['success'] && !empty($shippingQuote['quotes'])) {
+                    // Use the first (cheapest) option by default, or specific method if provided
+                    $selectedQuote = null;
+
+                    if ($shippingMethodCode) {
+                        $selectedQuote = collect($shippingQuote['quotes'])
+                            ->firstWhere('method.code', $shippingMethodCode);
+                    }
+
+                    if (!$selectedQuote) {
+                        $selectedQuote = collect($shippingQuote['quotes'])->first();
+                    }
+
+                    if ($selectedQuote) {
+                        $shippingAmount = $selectedQuote['rate']['price'];
+                        $shippingData = $selectedQuote;
+                    }
+                }
+            }
+
             // Create order
             $order = Order::create([
                 'user_id' => $cart->user_id,
@@ -355,9 +393,9 @@ class CheckoutController extends Controller
                 'status' => 'paid',
                 'subtotal' => $cart->subtotal,
                 'tax_amount' => 0, // Placeholder
-                'shipping_amount' => 0, // Placeholder
-                'total_amount' => $cart->subtotal,
-                'currency' => 'USD',
+                'shipping_amount' => $shippingAmount,
+                'total_amount' => $cart->subtotal + $shippingAmount,
+                'currency' => 'AUD', // Changed to AUD for Australian shipping
                 'payment_status' => 'paid',
                 'shipping_status' => 'pending',
             ]);

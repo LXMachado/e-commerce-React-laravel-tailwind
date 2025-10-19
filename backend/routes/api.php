@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\UserController;
+use App\Http\Controllers\Api\ShippingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,14 @@ Route::prefix('catalog')->name('catalog.')->group(function () {
     Route::get('/products', [App\Http\Controllers\Api\ProductController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'show'])->name('products.show');
     Route::get('/categories/{categorySlug}/products', [App\Http\Controllers\Api\ProductController::class, 'byCategory'])->name('products.by-category');
+
+    // Search
+    Route::get('/search', [App\Http\Controllers\Api\SearchController::class, 'search'])->name('search');
+    Route::get('/search/suggestions', [App\Http\Controllers\Api\SearchController::class, 'suggestions'])->name('search.suggestions');
+
+    // SEO
+    Route::get('/sitemap.xml', [App\Http\Controllers\Api\SeoController::class, 'sitemap'])->name('seo.sitemap');
+    Route::get('/robots.txt', [App\Http\Controllers\Api\SeoController::class, 'robots'])->name('seo.robots');
 
     // Product Variants
     Route::get('/variants', [App\Http\Controllers\Api\ProductVariantController::class, 'index'])->name('variants.index');
@@ -132,4 +141,22 @@ Route::middleware(['auth:sanctum'])->prefix('bundle-configurations')->name('bund
 
     // Get configuration statistics
     Route::get('/stats', [App\Http\Controllers\Api\BundleConfigurationController::class, 'stats'])->name('stats');
+});
+
+// Shipping API Routes (Public)
+Route::prefix('shipping')->name('shipping.')->group(function () {
+    // Calculate shipping cost for cart/order
+    Route::post('/quote', [ShippingController::class, 'quote'])->name('quote');
+
+    // List available shipping zones
+    Route::get('/zones', [ShippingController::class, 'zones'])->name('zones');
+
+    // List available shipping methods
+    Route::get('/methods', [ShippingController::class, 'methods'])->name('methods');
+
+    // Validate Australian address format
+    Route::post('/validate-address', [ShippingController::class, 'validateAddress'])->name('validate-address');
+
+    // Get weight tiers for reference
+    Route::get('/weight-tiers', [ShippingController::class, 'weightTiers'])->name('weight-tiers');
 });
