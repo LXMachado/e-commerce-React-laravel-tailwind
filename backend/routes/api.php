@@ -66,6 +66,23 @@ Route::prefix('checkout')->name('checkout.')->group(function () {
 // Stripe Webhook Route (no authentication required)
 Route::post('/webhooks/stripe', [App\Http\Controllers\Api\CheckoutController::class, 'webhook'])->name('webhooks.stripe');
 
+// Order API Routes (User)
+Route::middleware(['auth:sanctum'])->prefix('orders')->name('orders.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Api\OrderController::class, 'index'])->name('index');
+    Route::get('/stats', [App\Http\Controllers\Api\OrderController::class, 'stats'])->name('stats');
+    Route::get('/{order}', [App\Http\Controllers\Api\OrderController::class, 'show'])->name('show');
+    Route::post('/{order}/cancel', [App\Http\Controllers\Api\OrderController::class, 'cancel'])->name('cancel');
+});
+
+// Admin Order Management Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/orders')->name('admin.orders.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Api\AdminOrderController::class, 'index'])->name('index');
+    Route::get('/stats', [App\Http\Controllers\Api\AdminOrderController::class, 'stats'])->name('stats');
+    Route::get('/{order}', [App\Http\Controllers\Api\AdminOrderController::class, 'show'])->name('show');
+    Route::put('/{order}/status', [App\Http\Controllers\Api\AdminOrderController::class, 'updateStatus'])->name('update-status');
+    Route::post('/{order}/refund', [App\Http\Controllers\Api\AdminOrderController::class, 'refund'])->name('refund');
+});
+
 // Cart API Routes (Mixed authentication - guests and users)
 Route::prefix('cart')->name('cart.')->group(function () {
     Route::get('/', [App\Http\Controllers\Api\CartController::class, 'show'])->name('show');

@@ -3,6 +3,9 @@ import { AuthProvider } from './hooks/useAuth'
 import Login from './components/Login'
 import Register from './components/Register'
 import Dashboard from './components/Dashboard'
+import CheckoutPage from './components/CheckoutPage'
+import PaymentSuccess from './components/PaymentSuccess'
+import OrderHistory from './components/OrderHistory'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -13,6 +16,16 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/checkout/success" element={<PaymentSuccess />} />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <OrderHistory />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/"
               element={
