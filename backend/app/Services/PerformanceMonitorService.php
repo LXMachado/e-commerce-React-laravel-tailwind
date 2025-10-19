@@ -111,12 +111,33 @@ class PerformanceMonitorService
     }
 
     /**
-     * Store performance metrics
+     * Store performance metrics in database and cache
      */
     private function storePerformanceMetrics(array $performanceData): void
     {
-        $metricsKey = 'performance_metrics:' . date('Y-m-d-H');
+        // Store in database
+        \App\Models\PerformanceMetric::create([
+            'metric_type' => $performanceData['metric_type'] ?? 'general',
+            'metric_name' => $performanceData['metric_name'] ?? 'unknown',
+            'operation' => $performanceData['operation'] ?? null,
+            'endpoint' => $performanceData['endpoint'] ?? null,
+            'method' => $performanceData['method'] ?? null,
+            'value' => $performanceData['execution_time_ms'] ?? 0,
+            'unit' => 'ms',
+            'status' => $this->classifyPerformanceStatus($performanceData['execution_time_ms'] ?? 0),
+            'context' => $performanceData['context'] ?? null,
+            'metadata' => $performanceData['metadata'] ?? null,
+            'user_agent' => request()->userAgent(),
+            'ip_address' => request()->ip(),
+            'user_id' => auth()->id(),
+            'session_id' => session()->getId(),
+            'memory_usage_mb' => $this->getMemoryUsage(),
+            'cpu_usage_percent' => $this->getCpuUsage(),
+            'measured_at' => now(),
+        ]);
 
+        // Also store in cache for quick access
+        $metricsKey = 'performance_metrics:' . date('Y-m-d-H');
         $currentMetrics = Cache::get($metricsKey, []);
         $currentMetrics[] = $performanceData;
 
@@ -420,5 +441,455 @@ class PerformanceMonitorService
         }
 
         return $recommendations;
+    }
+
+    /**
+     * Monitor API response time
+     */
+    public function monitorApiResponse(string $endpoint, string $method, float $responseTime, array $context = []): void
+    {
+        $responseTimeMs = $responseTime * 1000;
+
+        $performanceData = [
+            'metric_type' => 'api_response',
+            'metric_name' => 'response_time',
+            'operation' => 'api_request',
+            'endpoint' => $endpoint,
+            'method' => $method,
+            'execution_time_ms' => round($responseTimeMs, 2),
+            'context' => $context,
+            'performance_level' => $this->classifyPerformance($responseTimeMs),
+        ];
+
+        // Log based on performance level
+        switch ($performanceData['performance_level']) {
+            case 'slow':
+                Log::warning('Slow API response detected', $performanceData);
+                break;
+            case 'very_slow':
+                Log::error('Very slow API response detected', $performanceData);
+                break;
+            default:
+                Log::info('API response performance', $performanceData);
+                break;
+        }
+
+        // Check if alerting is needed
+        if ($responseTimeMs > self::SLOW_QUERY_THRESHOLD) {
+            $this->triggerAlert('slow_api_response', $performanceData);
+        }
+
+        $this->storePerformanceMetrics($performanceData);
+    }
+
+    /**
+     * Monitor database query performance
+     */
+    public function monitorDatabaseQuery(string $query, float $executionTime, array $context = []): void
+    {
+        $executionTimeMs = $executionTime * 1000;
+
+        $performanceData = [
+            'metric_type' => 'database_query',
+            'metric_name' => 'query_execution_time',
+            'operation' => $query,
+            'execution_time_ms' => round($executionTimeMs, 2),
+            'context' => $context,
+            'performance_level' => $this->classifyPerformance($executionTimeMs),
+        ];
+
+        // Log slow queries
+        if ($executionTimeMs > self::SLOW_QUERY_THRESHOLD) {
+            Log::warning('Slow database query detected', $performanceData);
+        }
+
+        $this->storePerformanceMetrics($performanceData);
+    }
+
+    /**
+     * Monitor cache operations
+     */
+    public function monitorCacheOperation(string $operation, float $executionTime, bool $hit, array $context = []): void
+    {
+        $executionTimeMs = $executionTime * 1000;
+
+        $performanceData = [
+            'metric_type' => 'cache_operation',
+            'metric_name' => 'cache_' . $operation,
+            'operation' => $operation,
+            'execution_time_ms' => round($executionTimeMs, 2),
+            'context' => array_merge($context, ['cache_hit' => $hit]),
+            'performance_level' => $this->classifyPerformance($executionTimeMs),
+        ];
+
+        $this->storePerformanceMetrics($performanceData);
+    }
+
+    /**
+     * Monitor system resources
+     */
+    public function monitorSystemResources(): void
+    {
+        $metrics = [
+            'memory_usage' => $this->getMemoryUsage(),
+            'cpu_usage' => $this->getCpuUsage(),
+        ];
+
+        foreach ($metrics as $metric => $value) {
+            $performanceData = [
+                'metric_type' => 'system_resource',
+                'metric_name' => $metric,
+                'value' => $value,
+                'unit' => $metric === 'memory_usage' ? 'MB' : 'percent',
+                'measured_at' => now(),
+            ];
+
+            $this->storePerformanceMetrics($performanceData);
+        }
+    }
+
+    /**
+     * Get comprehensive performance statistics
+     */
+    public function getComprehensiveStats(string $timeRange = '1_hour'): array
+    {
+        return Cache::remember("comprehensive_stats:{$timeRange}", now()->addMinutes(5), function() use ($timeRange) {
+            return [
+                'api_performance' => $this->getApiPerformanceStats($timeRange),
+                'database_performance' => $this->getDatabasePerformanceStats($timeRange),
+                'cache_performance' => $this->getCachePerformanceStats($timeRange),
+                'system_performance' => $this->getSystemPerformanceStats($timeRange),
+                'media_performance' => $this->getMediaPerformanceStats($timeRange),
+                'overall_health' => $this->getOverallHealthScore($timeRange),
+            ];
+        });
+    }
+
+    /**
+     * Get API performance statistics
+     */
+    private function getApiPerformanceStats(string $timeRange): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        return [
+            'total_requests' => \App\Models\PerformanceMetric::where('metric_type', 'api_response')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->count(),
+            'average_response_time' => \App\Models\PerformanceMetric::where('metric_type', 'api_response')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->avg('value') ?? 0,
+            'slow_requests' => \App\Models\PerformanceMetric::where('metric_type', 'api_response')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->where('value', '>', self::SLOW_QUERY_THRESHOLD)
+                ->count(),
+            'top_endpoints' => $this->getTopEndpoints($timeRange),
+        ];
+    }
+
+    /**
+     * Get database performance statistics
+     */
+    private function getDatabasePerformanceStats(string $timeRange): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        return [
+            'total_queries' => \App\Models\PerformanceMetric::where('metric_type', 'database_query')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->count(),
+            'average_query_time' => \App\Models\PerformanceMetric::where('metric_type', 'database_query')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->avg('value') ?? 0,
+            'slow_queries' => \App\Models\PerformanceMetric::where('metric_type', 'database_query')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->where('value', '>', self::SLOW_QUERY_THRESHOLD)
+                ->count(),
+        ];
+    }
+
+    /**
+     * Get cache performance statistics
+     */
+    private function getCachePerformanceStats(string $timeRange): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        $cacheHits = \App\Models\PerformanceMetric::where('metric_type', 'cache_operation')
+            ->where('measured_at', '>=', now()->subHours($hours))
+            ->where('context->cache_hit', true)
+            ->count();
+
+        $cacheMisses = \App\Models\PerformanceMetric::where('metric_type', 'cache_operation')
+            ->where('measured_at', '>=', now()->subHours($hours))
+            ->where('context->cache_hit', false)
+            ->count();
+
+        $totalCacheOps = $cacheHits + $cacheMisses;
+        $hitRatio = $totalCacheOps > 0 ? $cacheHits / $totalCacheOps : 0;
+
+        return [
+            'total_operations' => $totalCacheOps,
+            'cache_hits' => $cacheHits,
+            'cache_misses' => $cacheMisses,
+            'hit_ratio' => round($hitRatio, 4),
+        ];
+    }
+
+    /**
+     * Get system performance statistics
+     */
+    private function getSystemPerformanceStats(string $timeRange): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        return [
+            'average_memory_usage' => \App\Models\PerformanceMetric::where('metric_type', 'system_resource')
+                ->where('metric_name', 'memory_usage')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->avg('value') ?? 0,
+            'average_cpu_usage' => \App\Models\PerformanceMetric::where('metric_type', 'system_resource')
+                ->where('metric_name', 'cpu_usage')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->avg('value') ?? 0,
+        ];
+    }
+
+    /**
+     * Get media performance statistics
+     */
+    private function getMediaPerformanceStats(string $timeRange): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        return [
+            'total_uploads' => \App\Models\PerformanceMetric::where('operation', 'media_upload')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->count(),
+            'total_processing' => \App\Models\PerformanceMetric::where('operation', 'media_processing')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->count(),
+            'average_upload_time' => \App\Models\PerformanceMetric::where('operation', 'media_upload')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->avg('value') ?? 0,
+            'average_processing_time' => \App\Models\PerformanceMetric::where('operation', 'media_processing')
+                ->where('measured_at', '>=', now()->subHours($hours))
+                ->avg('value') ?? 0,
+        ];
+    }
+
+    /**
+     * Get top slow endpoints
+     */
+    private function getTopEndpoints(string $timeRange, int $limit = 10): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        return \App\Models\PerformanceMetric::select('endpoint', 'method', \DB::raw('AVG(value) as avg_time'), \DB::raw('COUNT(*) as request_count'))
+            ->where('metric_type', 'api_response')
+            ->where('measured_at', '>=', now()->subHours($hours))
+            ->where('value', '>', self::SLOW_QUERY_THRESHOLD)
+            ->groupBy('endpoint', 'method')
+            ->orderBy('avg_time', 'desc')
+            ->limit($limit)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Get overall health score
+     */
+    private function getOverallHealthScore(string $timeRange): array
+    {
+        $stats = $this->getComprehensiveStats($timeRange);
+
+        $score = 100;
+
+        // Deduct points for slow API responses
+        $slowApiPercentage = ($stats['api_performance']['slow_requests'] / max($stats['api_performance']['total_requests'], 1)) * 100;
+        $score -= $slowApiPercentage * 1.5;
+
+        // Deduct points for slow database queries
+        $slowQueryPercentage = ($stats['database_performance']['slow_queries'] / max($stats['database_performance']['total_queries'], 1)) * 100;
+        $score -= $slowQueryPercentage * 2;
+
+        // Deduct points for high memory usage
+        if ($stats['system_performance']['average_memory_usage'] > 100) {
+            $score -= 20;
+        }
+
+        // Bonus points for good cache hit ratio
+        if ($stats['cache_performance']['hit_ratio'] > self::CACHE_HIT_RATIO_TARGET) {
+            $score += 5;
+        }
+
+        return [
+            'score' => max(0, min(100, $score)),
+            'status' => $this->getHealthStatus($score),
+            'last_updated' => now()->toISOString(),
+        ];
+    }
+
+    /**
+     * Classify performance status
+     */
+    private function classifyPerformanceStatus(float $value): string
+    {
+        if ($value > self::VERY_SLOW_QUERY_THRESHOLD) {
+            return 'critical';
+        } elseif ($value > self::SLOW_QUERY_THRESHOLD) {
+            return 'warning';
+        }
+
+        return 'success';
+    }
+
+    /**
+     * Get current memory usage
+     */
+    private function getMemoryUsage(): float
+    {
+        if (function_exists('memory_get_usage')) {
+            return round(memory_get_usage(true) / 1024 / 1024, 2); // Convert to MB
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get current CPU usage (Linux/Unix systems)
+     */
+    private function getCpuUsage(): float
+    {
+        if (function_exists('sys_getloadavg')) {
+            $load = sys_getloadavg();
+            return round($load[0] * 100, 2); // Convert load average to percentage
+        }
+
+        return 0;
+    }
+
+    /**
+     * Trigger performance alert
+     */
+    private function triggerAlert(string $alertType, array $data): void
+    {
+        try {
+            // Log alert
+            Log::warning('Performance alert triggered', [
+                'alert_type' => $alertType,
+                'data' => $data,
+                'threshold' => self::SLOW_QUERY_THRESHOLD,
+            ]);
+
+            // Here you could integrate with external alerting systems like:
+            // - Slack notifications
+            // - Email alerts
+            // - PagerDuty
+            // - DataDog/New Relic alerts
+
+            // For now, we'll just log it
+            // In production, you might want to dispatch an alert job
+
+        } catch (\Exception $e) {
+            Log::error('Failed to trigger performance alert', [
+                'alert_type' => $alertType,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Clean up old performance metrics
+     */
+    public function cleanupOldMetrics(int $daysToKeep = 30): int
+    {
+        try {
+            $deletedCount = \App\Models\PerformanceMetric::where('measured_at', '<', now()->subDays($daysToKeep))
+                ->delete();
+
+            Log::info('Cleaned up old performance metrics', [
+                'deleted_count' => $deletedCount,
+                'days_kept' => $daysToKeep,
+            ]);
+
+            return $deletedCount;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to cleanup old performance metrics', [
+                'error' => $e->getMessage(),
+                'days_to_keep' => $daysToKeep,
+            ]);
+
+            return 0;
+        }
+    }
+
+    /**
+     * Get performance trends
+     */
+    public function getPerformanceTrends(string $timeRange = '24_hours'): array
+    {
+        $hours = $this->parseTimeRange($timeRange);
+
+        return [
+            'api_response_trend' => $this->getTrendData('api_response', $hours),
+            'database_query_trend' => $this->getTrendData('database_query', $hours),
+            'cache_hit_trend' => $this->getCacheHitTrend($hours),
+            'system_resource_trend' => $this->getSystemResourceTrend($hours),
+        ];
+    }
+
+    /**
+     * Get trend data for a metric type
+     */
+    private function getTrendData(string $metricType, int $hours): array
+    {
+        return \App\Models\PerformanceMetric::select(
+                \DB::raw('DATE_FORMAT(measured_at, "%Y-%m-%d %H:00:00") as hour'),
+                \DB::raw('AVG(value) as avg_value'),
+                \DB::raw('COUNT(*) as count')
+            )
+            ->where('metric_type', $metricType)
+            ->where('measured_at', '>=', now()->subHours($hours))
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Get cache hit trend
+     */
+    private function getCacheHitTrend(int $hours): array
+    {
+        return \App\Models\PerformanceMetric::select(
+                \DB::raw('DATE_FORMAT(measured_at, "%Y-%m-%d %H:00:00") as hour'),
+                \DB::raw('AVG(CASE WHEN context->cache_hit = true THEN 1 ELSE 0 END) * 100 as hit_ratio')
+            )
+            ->where('metric_type', 'cache_operation')
+            ->where('measured_at', '>=', now()->subHours($hours))
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Get system resource trend
+     */
+    private function getSystemResourceTrend(int $hours): array
+    {
+        return \App\Models\PerformanceMetric::select(
+                \DB::raw('DATE_FORMAT(measured_at, "%Y-%m-%d %H:00:00") as hour'),
+                \DB::raw('AVG(CASE WHEN metric_name = "memory_usage" THEN value END) as avg_memory'),
+                \DB::raw('AVG(CASE WHEN metric_name = "cpu_usage" THEN value END) as avg_cpu')
+            )
+            ->where('metric_type', 'system_resource')
+            ->where('measured_at', '>=', now()->subHours($hours))
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->get()
+            ->toArray();
     }
 }

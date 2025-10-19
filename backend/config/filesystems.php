@@ -60,6 +60,34 @@ return [
             'report' => false,
         ],
 
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => env('R2_REGION', 'auto'),
+            'bucket' => env('R2_BUCKET'),
+            'endpoint' => env('R2_ENDPOINT', 'https://%s.r2.cloudflarestorage.com'),
+            'use_path_style_endpoint' => false,
+            'throw' => false,
+            'report' => false,
+            'url' => env('R2_URL'),
+            'visibility' => 'public',
+        ],
+
+        'cdn' => [
+            'driver' => 's3',
+            'key' => env('CDN_ACCESS_KEY_ID'),
+            'secret' => env('CDN_SECRET_ACCESS_KEY'),
+            'region' => env('CDN_REGION', 'auto'),
+            'bucket' => env('CDN_BUCKET'),
+            'endpoint' => env('CDN_ENDPOINT'),
+            'use_path_style_endpoint' => false,
+            'throw' => false,
+            'report' => false,
+            'url' => env('CDN_URL'),
+            'visibility' => 'public',
+        ],
+
     ],
 
     /*
