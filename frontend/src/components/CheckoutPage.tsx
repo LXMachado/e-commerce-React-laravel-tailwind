@@ -3,6 +3,7 @@ import { Elements } from '@stripe/react-stripe-js'
 import stripePromise from '../services/stripe'
 import PaymentForm from './PaymentForm'
 import { usePayment, PaymentIntent } from '../hooks/usePayment'
+import api from '../services/api'
 
 interface CartItem {
   id: number
@@ -33,6 +34,7 @@ const CheckoutPage: React.FC = () => {
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null)
   const [currentStep, setCurrentStep] = useState<'cart' | 'payment' | 'processing' | 'success' | 'error'>('cart')
   const [error, setError] = useState<string>('')
+  const [loadingCart, setLoadingCart] = useState(true)
 
   const { loading, initiatePayment, error: paymentError, clearError } = usePayment()
 
@@ -42,12 +44,12 @@ const CheckoutPage: React.FC = () => {
   }, [])
 
   const loadCart = async () => {
+    setLoadingCart(true)
     try {
-      const response = await fetch('/api/cart')
-      const data = await response.json()
+      const response = await api.get('/cart')
 
-      if (data.success) {
-        setCart(data.data)
+      if (response.data.success) {
+        setCart(response.data.data)
       } else {
         setError('Failed to load cart')
         setCurrentStep('error')
@@ -55,6 +57,8 @@ const CheckoutPage: React.FC = () => {
     } catch (err: any) {
       setError('Failed to load cart')
       setCurrentStep('error')
+    } finally {
+      setLoadingCart(false)
     }
   }
 
@@ -74,7 +78,7 @@ const CheckoutPage: React.FC = () => {
     }
   }
 
-  const handlePaymentSuccess = (paymentIntentId: string) => {
+  const handlePaymentSuccess = (_paymentIntentId: string) => {
     setCurrentStep('processing')
     // The webhook will handle the actual order creation
     // We'll redirect to success page after a brief delay
@@ -175,6 +179,29 @@ const CheckoutPage: React.FC = () => {
             </h2>
             <p className="mt-2 text-sm text-gray-600">
               Please wait while we confirm your payment.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadingCart) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+              <svg className="animate-spin h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Loading Cart...
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Please wait while we load your cart items.
             </p>
           </div>
         </div>

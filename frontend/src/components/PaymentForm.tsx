@@ -22,7 +22,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 }) => {
   const stripe = useStripe()
   const elements = useElements()
-  const { loading, confirmPayment, error, clearError } = usePayment()
+  const { loading, error, clearError } = usePayment()
 
   const [paymentElementReady, setPaymentElementReady] = useState(false)
   const [processing, setProcessing] = useState(false)
@@ -57,15 +57,30 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     clearError()
 
     try {
-      // First confirm payment with backend
-      const paymentConfirmed = await confirmPayment(paymentIntentId)
+      // First, confirm the payment with Stripe client-side
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: `${window.location.origin}/checkout/success`,
+        },
+        redirect: 'if_required',
+      })
 
-      if (!paymentConfirmed) {
-        throw new Error('Payment confirmation failed')
+      if (stripeError) {
+        throw new Error(stripeError.message || 'Payment confirmation failed')
       }
 
-      // If backend confirmation succeeds, the webhook will handle the rest
-      onPaymentSuccess(paymentIntentId)
+      if (paymentIntent?.status === 'succeeded') {
+        // Payment succeeded immediately (no 3DS required)
+        onPaymentSuccess(paymentIntentId)
+      } else if (paymentIntent?.status === 'processing') {
+        // Payment is processing (3DS completed, waiting for confirmation)
+        onPaymentSuccess(paymentIntentId)
+      } else {
+        // Payment requires further action or failed
+        throw new Error('Payment was not completed successfully')
+      }
 
     } catch (err: any) {
       const errorMessage = err.message || 'Payment failed'
@@ -98,7 +113,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               mode: 'billing',
               allowedCountries: ['US', 'CA', 'AU', 'GB'],
             }}
-            onChange={(event) => {
+            onChange={() => {
               // AddressElement doesn't provide error in the same way as PaymentElement
               // Errors are handled through form validation
             }}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { usePayment } from '../hooks/usePayment'
 
 interface PaymentStatusProps {
@@ -21,10 +21,18 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
   const [error, setError] = useState<string>('')
 
   const { checkPaymentStatus } = usePayment()
+  const timeoutRef = useRef<number | null>(null)
+  const pollingAttemptsRef = useRef(0)
 
   useEffect(() => {
+    // Reset polling when paymentIntentId changes
+    setPollingAttempts(0)
+    setPaymentStatus('pending')
+    setError('')
+    pollingAttemptsRef.current = 0
+
     const pollPaymentStatus = async () => {
-      if (pollingAttempts >= maxPollingAttempts) {
+      if (pollingAttemptsRef.current >= maxPollingAttempts) {
         setError('Payment confirmation timeout. Please contact support.')
         onPaymentError('Payment confirmation timeout')
         return
@@ -43,9 +51,8 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
 
             case 'processing':
               // Continue polling
-              setTimeout(() => {
-                setPollingAttempts(prev => prev + 1)
-              }, pollingInterval)
+              pollingAttemptsRef.current += 1
+              timeoutRef.current = setTimeout(pollPaymentStatus, pollingInterval)
               break
 
             case 'requires_payment_method':
@@ -69,33 +76,40 @@ const PaymentStatus: React.FC<PaymentStatusProps> = ({
                 onPaymentError(status.last_payment_error.message || 'Payment failed')
               } else {
                 // Continue polling for unknown status
-                setTimeout(() => {
-                  setPollingAttempts(prev => prev + 1)
-                }, pollingInterval)
+                pollingAttemptsRef.current += 1
+                timeoutRef.current = setTimeout(pollPaymentStatus, pollingInterval)
               }
           }
         } else {
           // Continue polling if no status received
-          setTimeout(() => {
-            setPollingAttempts(prev => prev + 1)
-          }, pollingInterval)
+          pollingAttemptsRef.current += 1
+          timeoutRef.current = setTimeout(pollPaymentStatus, pollingInterval)
         }
       } catch (err: any) {
         setError('Failed to check payment status')
         onPaymentError('Failed to check payment status')
 
         // Continue polling on error
-        setTimeout(() => {
-          setPollingAttempts(prev => prev + 1)
-        }, pollingInterval)
+        pollingAttemptsRef.current += 1
+        timeoutRef.current = setTimeout(pollPaymentStatus, pollingInterval)
       }
     }
 
     // Start polling after initial delay
-    const timeoutId = setTimeout(pollPaymentStatus, 1000)
+    timeoutRef.current = setTimeout(pollPaymentStatus, 1000)
 
-    return () => clearTimeout(timeoutId)
-  }, [paymentIntentId, pollingAttempts, maxPollingAttempts, pollingInterval, checkPaymentStatus, onPaymentSuccess, onPaymentError])
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [paymentIntentId, maxPollingAttempts, pollingInterval, checkPaymentStatus, onPaymentSuccess, onPaymentError])
+
+  // Update polling attempts display
+  useEffect(() => {
+    setPollingAttempts(pollingAttemptsRef.current)
+  }, [pollingAttemptsRef.current])
 
   const getStatusMessage = () => {
     switch (paymentStatus) {

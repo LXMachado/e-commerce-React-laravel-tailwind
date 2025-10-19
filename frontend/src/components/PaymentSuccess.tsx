@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import api from '../services/api'
 
 interface OrderData {
   id: number
@@ -47,39 +48,61 @@ const PaymentSuccess: React.FC = () => {
 
     const poll = async () => {
       try {
-        // This would typically call an API endpoint to get order by payment intent
-        // For now, we'll simulate the polling
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Try to find order by payment intent ID
+        // This would typically call an API endpoint like /api/orders/by-payment-intent/{paymentIntentId}
+        // For now, we'll poll the payment status and assume order creation
+        const response = await api.get(`/checkout/payment-status/${paymentIntentId}`)
 
-        // Simulate order creation after a few attempts
-        if (attempts >= 2) {
-          // Mock order data
-          setOrderData({
-            id: 1,
-            order_number: 'ORD-20250119-ABC12345',
-            total_amount: 299.99,
-            status: 'paid',
-            created_at: new Date().toISOString(),
-            items: [
-              {
-                id: 1,
-                quantity: 1,
-                price_at_time: 299.99,
-                product: {
-                  name: 'Solar Panel Pro 300W',
-                  slug: 'solar-panel-pro-300w'
+        if (response.data.success) {
+          const paymentStatus = response.data.data
+
+          if (paymentStatus.status === 'succeeded') {
+            // Payment succeeded, try to get order details
+            // Since we don't have a specific order lookup endpoint yet,
+            // we'll show a generic success message
+            setOrderData({
+              id: 1,
+              order_number: 'ORD-PENDING',
+              total_amount: paymentStatus.amount / 100, // Convert from cents
+              status: 'paid',
+              created_at: new Date().toISOString(),
+              items: [
+                {
+                  id: 1,
+                  quantity: 1,
+                  price_at_time: paymentStatus.amount / 100,
+                  product: {
+                    name: 'Order Processed',
+                    slug: 'order-processed'
+                  }
                 }
-              }
-            ]
-          })
-          setLoading(false)
+              ]
+            })
+            setLoading(false)
+          } else if (attempts >= maxAttempts) {
+            setError('Order confirmation timeout. Please check your email for order details.')
+            setLoading(false)
+          } else {
+            attempts++
+            setTimeout(poll, 2000) // Poll every 2 seconds
+          }
         } else {
           attempts++
-          setTimeout(poll, 1000)
+          if (attempts >= maxAttempts) {
+            setError('Failed to confirm payment status')
+            setLoading(false)
+          } else {
+            setTimeout(poll, 2000)
+          }
         }
       } catch (err: any) {
-        setError('Failed to retrieve order information')
-        setLoading(false)
+        attempts++
+        if (attempts >= maxAttempts) {
+          setError('Failed to retrieve order information')
+          setLoading(false)
+        } else {
+          setTimeout(poll, 2000)
+        }
       }
     }
 
@@ -88,22 +111,22 @@ const PaymentSuccess: React.FC = () => {
 
   const loadOrderData = async (orderId: string) => {
     try {
-      // This would call the orders API endpoint
-      // For now, we'll use mock data
+      // This would call the orders API endpoint: /api/orders/{orderId}
+      // For now, we'll show a message that the order is being processed
       setOrderData({
         id: parseInt(orderId),
-        order_number: 'ORD-20250119-ABC12345',
-        total_amount: 299.99,
-        status: 'paid',
+        order_number: 'ORD-PENDING',
+        total_amount: 0,
+        status: 'processing',
         created_at: new Date().toISOString(),
         items: [
           {
             id: 1,
             quantity: 1,
-            price_at_time: 299.99,
+            price_at_time: 0,
             product: {
-              name: 'Solar Panel Pro 300W',
-              slug: 'solar-panel-pro-300w'
+              name: 'Order Being Processed',
+              slug: 'order-processing'
             }
           }
         ]

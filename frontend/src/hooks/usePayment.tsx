@@ -83,7 +83,7 @@ export const usePayment = () => {
     }
   }, [])
 
-  const checkPaymentStatus = useCallback(async (paymentIntentId: string): Promise<PaymentStatus | null> => {
+  const checkPaymentStatus = useCallback(async (paymentIntentId: string, retryCount = 0): Promise<PaymentStatus | null> => {
     try {
       const response = await api.get(`/checkout/payment-status/${paymentIntentId}`)
 
@@ -94,6 +94,13 @@ export const usePayment = () => {
       }
     } catch (err: any) {
       console.error('Failed to check payment status:', err)
+
+      // Retry logic for network failures
+      if (retryCount < 3 && (err.code === 'NETWORK_ERROR' || err.response?.status >= 500)) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000)) // Exponential backoff
+        return checkPaymentStatus(paymentIntentId, retryCount + 1)
+      }
+
       return null
     }
   }, [])
