@@ -15,6 +15,7 @@ class Cart extends Model
         'user_id',
         'session_id',
         'is_active',
+        'payment_intent_id',
     ];
 
     protected $casts = [

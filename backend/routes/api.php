@@ -56,6 +56,16 @@ Route::middleware(['auth:sanctum'])->prefix('admin/catalog')->name('admin.catalo
     Route::patch('/variants/{variant}/stock', [App\Http\Controllers\Api\ProductVariantController::class, 'updateStock'])->name('variants.update-stock');
 });
 
+// Checkout API Routes
+Route::prefix('checkout')->name('checkout.')->group(function () {
+    Route::post('/initiate', [App\Http\Controllers\Api\CheckoutController::class, 'initiate'])->name('initiate');
+    Route::post('/process', [App\Http\Controllers\Api\CheckoutController::class, 'process'])->name('process');
+    Route::get('/payment-status/{paymentIntentId}', [App\Http\Controllers\Api\CheckoutController::class, 'paymentStatus'])->name('payment-status');
+});
+
+// Stripe Webhook Route (no authentication required)
+Route::post('/webhooks/stripe', [App\Http\Controllers\Api\CheckoutController::class, 'webhook'])->name('webhooks.stripe');
+
 // Cart API Routes (Mixed authentication - guests and users)
 Route::prefix('cart')->name('cart.')->group(function () {
     Route::get('/', [App\Http\Controllers\Api\CartController::class, 'show'])->name('show');
