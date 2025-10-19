@@ -97,44 +97,47 @@ class BundleConfiguration extends Model
      */
     public function calculateTotals(): void
     {
-        $totalPrice = $this->bundle->price; // Base price
+        $totalPrice = $this->bundle->price ?? 0; // Base price
         $totalWeight = $this->bundle->base_weight_g ?? 0; // Base weight
 
         if ($this->configuration_data) {
+            $availableOptions = $this->bundle->getAvailableOptions();
+
             // Add espresso module price/weight if selected
             if (isset($this->configuration_data['espresso_module']) && $this->configuration_data['espresso_module']) {
-                $totalPrice += 150.00; // Example price - should come from actual product
-                $totalWeight += 800; // Example weight in grams
+                $espressoModule = $availableOptions['espresso_module'] ?? null;
+                if ($espressoModule) {
+                    $totalPrice += $espressoModule['price'];
+                    $totalWeight += $espressoModule['weight_g'];
+                }
             }
 
             // Add filter attachment price/weight if selected
             if (isset($this->configuration_data['filter_attachment']) && $this->configuration_data['filter_attachment']) {
-                $totalPrice += 75.00;
-                $totalWeight += 300;
+                $filterAttachment = $availableOptions['filter_attachment'] ?? null;
+                if ($filterAttachment) {
+                    $totalPrice += $filterAttachment['price'];
+                    $totalWeight += $filterAttachment['weight_g'];
+                }
             }
 
             // Add fan accessory price/weight if selected
             if (isset($this->configuration_data['fan_accessory']) && $this->configuration_data['fan_accessory']) {
-                $totalPrice += 45.00;
-                $totalWeight += 200;
+                $fanAccessory = $availableOptions['fan_accessory'] ?? null;
+                if ($fanAccessory) {
+                    $totalPrice += $fanAccessory['price'];
+                    $totalWeight += $fanAccessory['weight_g'];
+                }
             }
 
             // Add solar panel price/weight based on size
             $solarPanelSize = $this->configuration_data['solar_panel_size'] ?? '10W';
-            switch ($solarPanelSize) {
-                case '15W':
-                    $totalPrice += 50.00;
-                    $totalWeight += 400;
-                    break;
-                case '20W':
-                    $totalPrice += 100.00;
-                    $totalWeight += 600;
-                    break;
-                case '10W':
-                default:
-                    $totalPrice += 25.00;
-                    $totalWeight += 250;
-                    break;
+            $solarPanelSizes = $availableOptions['solar_panel_sizes'] ?? [];
+            $selectedPanel = $solarPanelSizes[$solarPanelSize] ?? null;
+
+            if ($selectedPanel) {
+                $totalPrice += $selectedPanel['price'];
+                $totalWeight += $selectedPanel['weight_g'];
             }
         }
 

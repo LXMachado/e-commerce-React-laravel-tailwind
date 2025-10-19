@@ -57,12 +57,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     clearError()
 
     try {
-      // First, confirm the payment with Stripe client-side
+      // Confirm the payment with Stripe client-side
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${window.location.origin}/checkout/success`,
+          return_url: `${window.location.origin}/checkout/success?payment_intent=${paymentIntentId}`,
         },
         redirect: 'if_required',
       })

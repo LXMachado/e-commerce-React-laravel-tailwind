@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import CheckoutPage from './components/CheckoutPage'
 import PaymentSuccess from './components/PaymentSuccess'
 import OrderHistory from './components/OrderHistory'
+import BundleBuilder from './components/BundleBuilder'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/bundle-builder" element={<BundleBuilder />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/checkout/success" element={<PaymentSuccess />} />
             <Route

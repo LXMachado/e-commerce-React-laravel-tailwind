@@ -119,9 +119,8 @@ class BundleConfigurationRequest extends FormRequest
 
             // Solar panel size is always required, but we already validate that
 
-            if (!$hasOptions) {
-                $validator->errors()->add('configuration', 'Please select at least one optional component or ensure solar panel size is specified.');
-            }
+            // Allow configurations with just solar panel size (basic kit)
+            // The solar panel size is already validated as required above
         });
     }
 }
