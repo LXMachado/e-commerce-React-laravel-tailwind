@@ -97,3 +97,39 @@ Route::prefix('cart')->name('cart.')->group(function () {
 Route::middleware(['auth:sanctum'])->prefix('cart')->name('cart.')->group(function () {
     Route::post('/merge-guest', [App\Http\Controllers\Api\CartController::class, 'mergeGuestCart'])->name('merge-guest');
 });
+
+// Bundle API Routes (Public)
+Route::prefix('bundles')->name('bundles.')->group(function () {
+    // Get bundle details with options
+    Route::get('/{slug}', [App\Http\Controllers\Api\BundleController::class, 'show'])->name('show');
+
+    // Create custom bundle configuration
+    Route::post('/{slug}/configure', [App\Http\Controllers\Api\BundleController::class, 'configure'])->name('configure');
+
+    // Get saved configuration
+    Route::get('/configurations/{id}', [App\Http\Controllers\Api\BundleController::class, 'getConfiguration'])->name('configurations.show');
+
+    // Add configured bundle to cart
+    Route::post('/configurations/{id}/add-to-cart', [App\Http\Controllers\Api\BundleController::class, 'addToCart'])->name('configurations.add-to-cart');
+
+    // Get shared configuration by token
+    Route::get('/shared/{shareToken}', [App\Http\Controllers\Api\BundleController::class, 'getSharedConfiguration'])->name('configurations.shared');
+});
+
+// Bundle Configuration Management Routes (Authenticated users)
+Route::middleware(['auth:sanctum'])->prefix('bundle-configurations')->name('bundle-configurations.')->group(function () {
+    // List user's configurations
+    Route::get('/', [App\Http\Controllers\Api\BundleConfigurationController::class, 'index'])->name('index');
+
+    // Update configuration
+    Route::put('/{id}', [App\Http\Controllers\Api\BundleConfigurationController::class, 'update'])->name('update');
+
+    // Delete configuration
+    Route::delete('/{id}', [App\Http\Controllers\Api\BundleConfigurationController::class, 'destroy'])->name('destroy');
+
+    // Duplicate configuration
+    Route::post('/{id}/duplicate', [App\Http\Controllers\Api\BundleConfigurationController::class, 'duplicate'])->name('duplicate');
+
+    // Get configuration statistics
+    Route::get('/stats', [App\Http\Controllers\Api\BundleConfigurationController::class, 'stats'])->name('stats');
+});
