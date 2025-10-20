@@ -65,7 +65,7 @@ class Bundle extends Model
      */
     public function getCurrentPrice(): float
     {
-        return $this->compare_at_price ?? $this->price;
+        return $this->price;
     }
 
     /**

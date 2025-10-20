@@ -68,7 +68,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       })
 
       if (stripeError) {
-        throw new Error(stripeError.message || 'Payment confirmation failed')
+        // Handle different types of Stripe errors
+        if (stripeError.type === 'card_error' || stripeError.type === 'validation_error') {
+          throw new Error(stripeError.message || 'Payment information is invalid')
+        } else {
+          throw new Error(stripeError.message || 'Payment confirmation failed')
+        }
       }
 
       if (paymentIntent?.status === 'succeeded') {
@@ -77,9 +82,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       } else if (paymentIntent?.status === 'processing') {
         // Payment is processing (3DS completed, waiting for confirmation)
         onPaymentSuccess(paymentIntentId)
+      } else if (paymentIntent?.status === 'requires_action') {
+        // Payment requires additional action (like 3DS)
+        // The redirect should have happened automatically, but handle it here if needed
+        throw new Error('Payment requires additional authentication. Please try again.')
       } else {
-        // Payment requires further action or failed
-        throw new Error('Payment was not completed successfully')
+        // Payment failed or has unknown status
+        throw new Error(`Payment failed with status: ${paymentIntent?.status || 'unknown'}`)
       }
 
     } catch (err: any) {

@@ -103,24 +103,9 @@ class BundleConfigurationRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Custom validation: ensure at least one meaningful option is selected
-            $configuration = $this->input('configuration', []);
-
-            $hasOptions = false;
-            if (isset($configuration['espresso_module']) && $configuration['espresso_module']) {
-                $hasOptions = true;
-            }
-            if (isset($configuration['filter_attachment']) && $configuration['filter_attachment']) {
-                $hasOptions = true;
-            }
-            if (isset($configuration['fan_accessory']) && $configuration['fan_accessory']) {
-                $hasOptions = true;
-            }
-
-            // Solar panel size is always required, but we already validate that
-
-            // Allow configurations with just solar panel size (basic kit)
-            // The solar panel size is already validated as required above
+            // Allow all valid configurations including base kit (solar panel only)
+            // The solar panel size is already validated as required in rules()
+            // Optional modules are truly optional and can all be false
         });
     }
 }

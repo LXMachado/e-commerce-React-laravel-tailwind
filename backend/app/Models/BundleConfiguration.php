@@ -151,24 +151,35 @@ class BundleConfiguration extends Model
      */
     public function calculateWeightCompatibility(): void
     {
-        $weight = $this->total_weight_g / 1000; // Convert to kg
+        $weight = $this->total_weight_g; // Keep in grams for accurate comparison
+        $weightThresholds = $this->bundle->getWeightThresholds();
 
-        if ($weight < 5) {
+        // Find the appropriate threshold based on total weight
+        $compatibleThreshold = null;
+        foreach ($weightThresholds as $threshold) {
+            if ($weight <= $threshold['max_weight_g']) {
+                $compatibleThreshold = $threshold;
+                break;
+            }
+        }
+
+        // If no threshold found (weight exceeds all thresholds), use the last one
+        if (!$compatibleThreshold && !empty($weightThresholds)) {
+            $compatibleThreshold = end($weightThresholds);
+        }
+
+        if ($compatibleThreshold) {
             $this->weight_compatibility = [
-                'threshold' => '<5kg',
-                'description' => 'Day-pack compatible',
-                'compatible' => true
-            ];
-        } elseif ($weight <= 10) {
-            $this->weight_compatibility = [
-                'threshold' => '5-10kg',
-                'description' => 'Overnight pack compatible',
-                'compatible' => true
+                'threshold' => array_search($compatibleThreshold, $weightThresholds) ?: 'unknown',
+                'description' => $compatibleThreshold['description'],
+                'compatible' => $weight <= $compatibleThreshold['max_weight_g'],
+                'max_weight_g' => $compatibleThreshold['max_weight_g']
             ];
         } else {
+            // Fallback if no thresholds are defined
             $this->weight_compatibility = [
-                'threshold' => '>10kg',
-                'description' => 'Base camp setup',
+                'threshold' => 'unknown',
+                'description' => 'Compatibility unknown',
                 'compatible' => false
             ];
         }
