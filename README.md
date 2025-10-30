@@ -8,6 +8,8 @@ A modern full-stack e-commerce platform built with Laravel and React, specializi
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.x-teal?style=flat-square&logo=tailwindcss)
 ![PHP](https://img.shields.io/badge/PHP-8.2+-purple?style=flat-square&logo=php)
 
+![Weekender Frontend](public/images/weekender-frontend-desk.png)
+
 ## 🚀 Features
 
 - **Modern Stack**: Laravel 11 + React 18 + TypeScript + Vite
