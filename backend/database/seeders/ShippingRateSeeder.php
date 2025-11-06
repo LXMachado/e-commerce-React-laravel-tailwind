@@ -38,15 +38,19 @@ class ShippingRateSeeder extends Seeder
                         continue;
                     }
 
-                    ShippingRate::create([
-                        'shipping_zone_id' => $zone->id,
-                        'shipping_method_id' => $method->id,
-                        'min_weight' => $tier['min'],
-                        'max_weight' => $tier['max'],
-                        'price' => $tier['price'] * 100, // Convert to cents
-                        'currency' => 'AUD',
-                        'is_active' => true,
-                    ]);
+                    ShippingRate::firstOrCreate(
+                        [
+                            'shipping_zone_id' => $zone->id,
+                            'shipping_method_id' => $method->id,
+                            'min_weight' => $tier['min'],
+                            'max_weight' => $tier['max'],
+                        ],
+                        [
+                            'price' => $tier['price'] * 100, // Convert to cents
+                            'currency' => 'AUD',
+                            'is_active' => true,
+                        ]
+                    );
 
                     $createdRates++;
                 }

@@ -59,7 +59,10 @@ class ShippingZoneSeeder extends Seeder
         ];
 
         foreach ($zones as $zone) {
-            ShippingZone::create($zone);
+            ShippingZone::firstOrCreate(
+                ['postcode_pattern' => $zone['postcode_pattern']],
+                $zone
+            );
         }
 
         $this->command->info('Created ' . count($zones) . ' Australian shipping zones');

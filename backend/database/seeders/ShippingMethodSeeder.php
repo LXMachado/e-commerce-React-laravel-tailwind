@@ -38,7 +38,10 @@ class ShippingMethodSeeder extends Seeder
         ];
 
         foreach ($methods as $method) {
-            ShippingMethod::create($method);
+            ShippingMethod::firstOrCreate(
+                ['code' => $method['code']],
+                $method
+            );
         }
 
         $this->command->info('Created ' . count($methods) . ' shipping methods');

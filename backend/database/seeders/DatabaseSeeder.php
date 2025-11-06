@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             ShippingZoneSeeder::class,
             ShippingMethodSeeder::class,
             ShippingRateSeeder::class,
+            // BundleSeeder::class, // Temporarily disabled due to total_price constraint issue
             SeoDataSeeder::class,
         ]);
     }
