@@ -1,0 +1,162 @@
+<?php
+
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\UserController;
+use App\Http\Controllers\Api\ShippingController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
+
+Route::prefix('auth')->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])->group(function () {
+    Route::post('/register', RegisterController::class)->name('auth.register');
+    Route::post('/login', LoginController::class)->name('auth.login');
+    Route::post('/logout', LogoutController::class)->name('auth.logout')->middleware('auth:sanctum');
+});
+
+Route::middleware('auth:sanctum')->get('/user', UserController::class);
+
+// Catalog API Routes (Public)
+Route::prefix('catalog')->name('catalog.')->group(function () {
+    // Categories
+    Route::get('/categories', [App\Http\Controllers\Api\CategoryController::class, 'index'])->name('categories.index');
+    Route::get('/categories/tree', [App\Http\Controllers\Api\CategoryController::class, 'tree'])->name('categories.tree');
+    Route::get('/categories/{category}', [App\Http\Controllers\Api\CategoryController::class, 'show'])->name('categories.show');
+
+    // Products
+    Route::get('/products', [App\Http\Controllers\Api\ProductController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'show'])->name('products.show');
+    Route::get('/categories/{categorySlug}/products', [App\Http\Controllers\Api\ProductController::class, 'byCategory'])->name('products.by-category');
+
+    // Search
+    Route::get('/search', [App\Http\Controllers\Api\SearchController::class, 'search'])->name('search');
+    Route::get('/search/suggestions', [App\Http\Controllers\Api\SearchController::class, 'suggestions'])->name('search.suggestions');
+
+    // SEO
+    Route::get('/sitemap.xml', [App\Http\Controllers\Api\SeoController::class, 'sitemap'])->name('seo.sitemap');
+    Route::get('/robots.txt', [App\Http\Controllers\Api\SeoController::class, 'robots'])->name('seo.robots');
+
+    // Product Variants
+    Route::get('/variants', [App\Http\Controllers\Api\ProductVariantController::class, 'index'])->name('variants.index');
+    Route::get('/variants/{variant}', [App\Http\Controllers\Api\ProductVariantController::class, 'show'])->name('variants.show');
+    Route::get('/products/{productId}/variants', [App\Http\Controllers\Api\ProductVariantController::class, 'byProduct'])->name('variants.by-product');
+});
+
+// Protected Catalog API Routes (Admin/Manager only)
+Route::middleware(['auth:sanctum'])->prefix('admin/catalog')->name('admin.catalog.')->group(function () {
+    // Category Management
+    Route::post('/categories', [App\Http\Controllers\Api\CategoryController::class, 'store'])->name('categories.store');
+    Route::put('/categories/{category}', [App\Http\Controllers\Api\CategoryController::class, 'update'])->name('categories.update');
+    Route::delete('/categories/{category}', [App\Http\Controllers\Api\CategoryController::class, 'destroy'])->name('categories.destroy');
+
+    // Product Management
+    Route::post('/products', [App\Http\Controllers\Api\ProductController::class, 'store'])->name('products.store');
+    Route::put('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'update'])->name('products.update');
+    Route::delete('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'destroy'])->name('products.destroy');
+
+    // Product Variant Management
+    Route::post('/variants', [App\Http\Controllers\Api\ProductVariantController::class, 'store'])->name('variants.store');
+    Route::put('/variants/{variant}', [App\Http\Controllers\Api\ProductVariantController::class, 'update'])->name('variants.update');
+    Route::delete('/variants/{variant}', [App\Http\Controllers\Api\ProductVariantController::class, 'destroy'])->name('variants.destroy');
+    Route::patch('/variants/{variant}/stock', [App\Http\Controllers\Api\ProductVariantController::class, 'updateStock'])->name('variants.update-stock');
+});
+
+// Checkout API Routes
+Route::prefix('checkout')->name('checkout.')->group(function () {
+    Route::post('/initiate', [App\Http\Controllers\Api\CheckoutController::class, 'initiate'])->name('initiate');
+    Route::post('/process', [App\Http\Controllers\Api\CheckoutController::class, 'process'])->name('process');
+    Route::get('/payment-status/{paymentIntentId}', [App\Http\Controllers\Api\CheckoutController::class, 'paymentStatus'])->name('payment-status');
+});
+
+// Stripe Webhook Route (no authentication required)
+Route::post('/webhooks/stripe', [App\Http\Controllers\Api\CheckoutController::class, 'webhook'])->name('webhooks.stripe');
+
+// Order API Routes (User)
+Route::middleware(['auth:sanctum'])->prefix('orders')->name('orders.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Api\OrderController::class, 'index'])->name('index');
+    Route::get('/stats', [App\Http\Controllers\Api\OrderController::class, 'stats'])->name('stats');
+    Route::get('/{order}', [App\Http\Controllers\Api\OrderController::class, 'show'])->name('show');
+    Route::post('/{order}/cancel', [App\Http\Controllers\Api\OrderController::class, 'cancel'])->name('cancel');
+});
+
+// Admin Order Management Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/orders')->name('admin.orders.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Api\AdminOrderController::class, 'index'])->name('index');
+    Route::get('/stats', [App\Http\Controllers\Api\AdminOrderController::class, 'stats'])->name('stats');
+    Route::get('/{order}', [App\Http\Controllers\Api\AdminOrderController::class, 'show'])->name('show');
+    Route::put('/{order}/status', [App\Http\Controllers\Api\AdminOrderController::class, 'updateStatus'])->name('update-status');
+    Route::post('/{order}/refund', [App\Http\Controllers\Api\AdminOrderController::class, 'refund'])->name('refund');
+});
+
+// Cart API Routes (Mixed authentication - guests and users)
+Route::prefix('cart')->name('cart.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Api\CartController::class, 'show'])->name('show');
+    Route::post('/items', [App\Http\Controllers\Api\CartController::class, 'addItem'])->name('add-item');
+    Route::put('/items/{item}', [App\Http\Controllers\Api\CartController::class, 'updateItem'])->name('update-item');
+    Route::delete('/items/{item}', [App\Http\Controllers\Api\CartController::class, 'removeItem'])->name('remove-item');
+    Route::delete('/', [App\Http\Controllers\Api\CartController::class, 'clear'])->name('clear');
+    Route::get('/totals', [App\Http\Controllers\Api\CartController::class, 'totals'])->name('totals');
+});
+
+// Protected Cart Routes (Authenticated users only)
+Route::middleware(['auth:sanctum'])->prefix('cart')->name('cart.')->group(function () {
+    Route::post('/merge-guest', [App\Http\Controllers\Api\CartController::class, 'mergeGuestCart'])->name('merge-guest');
+});
+
+// Bundle API Routes (Public)
+Route::prefix('bundles')->name('bundles.')->group(function () {
+    // Get bundle details with options
+    Route::get('/{slug}', [App\Http\Controllers\Api\BundleController::class, 'show'])->name('show');
+
+    // Create custom bundle configuration
+    Route::post('/{slug}/configure', [App\Http\Controllers\Api\BundleController::class, 'configure'])->name('configure');
+
+    // Get saved configuration
+    Route::get('/configurations/{id}', [App\Http\Controllers\Api\BundleController::class, 'getConfiguration'])->name('configurations.show');
+
+    // Add configured bundle to cart
+    Route::post('/configurations/{id}/add-to-cart', [App\Http\Controllers\Api\BundleController::class, 'addToCart'])->name('configurations.add-to-cart');
+
+    // Get shared configuration by token
+    Route::get('/shared/{shareToken}', [App\Http\Controllers\Api\BundleController::class, 'getSharedConfiguration'])->name('configurations.shared');
+});
+
+// Bundle Configuration Management Routes (Authenticated users)
+Route::middleware(['auth:sanctum'])->prefix('bundle-configurations')->name('bundle-configurations.')->group(function () {
+    // List user's configurations
+    Route::get('/', [App\Http\Controllers\Api\BundleConfigurationController::class, 'index'])->name('index');
+
+    // Update configuration
+    Route::put('/{id}', [App\Http\Controllers\Api\BundleConfigurationController::class, 'update'])->name('update');
+
+    // Delete configuration
+    Route::delete('/{id}', [App\Http\Controllers\Api\BundleConfigurationController::class, 'destroy'])->name('destroy');
+
+    // Duplicate configuration
+    Route::post('/{id}/duplicate', [App\Http\Controllers\Api\BundleConfigurationController::class, 'duplicate'])->name('duplicate');
+
+    // Get configuration statistics
+    Route::get('/stats', [App\Http\Controllers\Api\BundleConfigurationController::class, 'stats'])->name('stats');
+});
+
+// Shipping API Routes (Public)
+Route::prefix('shipping')->name('shipping.')->group(function () {
+    // Calculate shipping cost for cart/order
+    Route::post('/quote', [ShippingController::class, 'quote'])->name('quote');
+
+    // List available shipping zones
+    Route::get('/zones', [ShippingController::class, 'zones'])->name('zones');
+
+    // List available shipping methods
+    Route::get('/methods', [ShippingController::class, 'methods'])->name('methods');
+
+    // Validate Australian address format
+    Route::post('/validate-address', [ShippingController::class, 'validateAddress'])->name('validate-address');
+
+    // Get weight tiers for reference
+    Route::get('/weight-tiers', [ShippingController::class, 'weightTiers'])->name('weight-tiers');
+});
