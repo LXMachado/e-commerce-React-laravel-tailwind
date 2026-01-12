@@ -186,3 +186,6 @@ config/secrets.json
 
 # Documentation build
 docs/_build/
+
+# Documentation folder
+Documentation/
